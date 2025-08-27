@@ -1,19 +1,36 @@
 const User = require("../models/userModel");
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+const axios = require("axios");
 
-// --- Fonctions d'Envoi de Messages (à remplacer par de vrais appels API Meta) ---
+const { WHATSAPP_API_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN } =
+  process.env;
 
-// Fonction générique pour envoyer un message texte
+if (!WHATSAPP_API_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+  throw new Error(
+    "Les variables d'environnement WhatsApp (token ou ID) ne sont pas définies !"
+  );
+}
+
+// Fonction utilitaire pour envoyer un message WhatsApp
 async function sendMessage(to, text) {
-  // TODO: Remplacez cette partie par un véritable appel à l'API WhatsApp Cloud
-  // Exemple avec axios:
-  await axios.post('https://graph.facebook.com/v19.0/VOTRE_ID_TELEPHONE/messages', {
-    messaging_product: 'whatsapp',
-    to: to,
-    text: { body: text }
-  }, { headers: { 'Authorization': `Bearer VOTRE_TOKEN_PERMANENT` } });
-
-  console.log(`-> Message envoyé à ${to}: "${text}"`);
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v19.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: to,
+        text: { body: text },
+      },
+      {
+        headers: { Authorization: `Bearer ${WHATSAPP_API_TOKEN}` },
+      }
+    );
+    console.log(`-> Message envoyé avec succès à ${to}`);
+  } catch (error) {
+    console.error(
+      "Erreur Client API:",
+      error.response ? error.response.data : error.message
+    );
+  }
 }
 
 // Fonction pour envoyer le menu principal
@@ -29,15 +46,13 @@ Que souhaitez-vous faire ? Répondez avec le numéro correspondant :
   await sendMessage(to, menuText);
 }
 
-// --- Contrôleurs de Webhook ---
-
-// Vérification du webhook (requête GET de Meta)
+// Vérification du webhook (GET)
 const verifyWebhook = (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (mode && token === VERIFY_TOKEN) {
+  if (mode && token === WHATSAPP_VERIFY_TOKEN) {
     if (mode === "subscribe") {
       console.log("WEBHOOK_VERIFIED");
       res.status(200).send(challenge);
@@ -49,7 +64,7 @@ const verifyWebhook = (req, res) => {
   }
 };
 
-// Traitement des messages entrants (requête POST de Meta)
+// Traitement des messages entrants (POST)
 const processMessage = async (req, res) => {
   try {
     const body = req.body;
@@ -99,7 +114,6 @@ const processMessage = async (req, res) => {
           break;
 
         case "main_menu":
-          // Gérer les options du menu
           if (userText === "1") {
             await sendMessage(
               user.whatsappId,
@@ -125,4 +139,4 @@ const processMessage = async (req, res) => {
   }
 };
 
-module.exports = { verifyWebhook, processMessage };
+module.exports = { verifyWebhook, processMessage, sendMessage };

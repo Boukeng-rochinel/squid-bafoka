@@ -1,4 +1,4 @@
-const { sendMessage } = require("./whatsappClient");
+const { sendMessage } = require("../Controllers/whatsappController");
 const Item = require("../models/itemModel");
 
 async function sendMainMenu(to) {

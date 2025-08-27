@@ -1,10 +1,10 @@
 // Importer les dépendances
+require("dotenv").config(); // Charger les variables d'environnement
 const express = require("express");
 const bodyParser = require("body-parser");
 const Home = require("./Routes/homeRoutes");
 const whatsappRoutes = require("./Routes/whatsappRoutes");
 const connectDB = require("./config/database");
-require("dotenv").config(); // Charger les variables d'environnement
 
 const app = express();
 
