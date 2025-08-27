@@ -1,0 +1,11 @@
+{
+  "name": "squid_bafoka",
+  "version": "1.0.0",
+  "description": "a project for managing trade",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "squid team",
+  "license": "ISC"
+}
