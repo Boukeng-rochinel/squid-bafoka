@@ -11,7 +11,7 @@ const { home } = require("../Controllers/homeControllers");
 const router = express.Router();
 
 // router.post("/", auth, createJob);
-router.post("/", home);
+router.get("/", home);
 
 // router.get("/", getAllJobs);
 // router.get("/:name", auth, findJobByName);
