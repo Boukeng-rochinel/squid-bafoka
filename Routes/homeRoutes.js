@@ -6,7 +6,7 @@ const express = require("express");
 //   deleteJob,
 // } = require("../Controllers/JobsController");
 // const auth = require("../Middlewares/AuthMiddlewares");
-const home = require("../Controllers/homeControllers")
+const { home } = require("../Controllers/homeControllers");
 
 const router = express.Router();
 
