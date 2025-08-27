@@ -1,6 +1,8 @@
 // Importer les dépendances
 const express = require("express");
 const bodyParser = require("body-parser");
+const Home = require("./Routes/homeRoutes")
+const whatsappRoutes = require("./Routes/whatsappRoutes");
 require("dotenv").config(); // Charger les variables d'environnement
 
 // Importer la logique de l'application depuis app.js (pour une meilleure structure)
@@ -10,6 +12,7 @@ const app = require("./app");
 const PORT = process.env.PORT || 3000;
 
 app.use("/", Home)
+app.use("/webhook", whatsappRoutes);
 
 // Lancer le serveur
 app.listen(PORT, () => {
