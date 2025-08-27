@@ -16,7 +16,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 
 app.use("/", Home);
-app.use("/webhook", whatsappRoutes);
+app.use("/api", whatsappRoutes);
 
 // Lancer le serveur
 app.listen(PORT, () => {
