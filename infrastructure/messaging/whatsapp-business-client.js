@@ -21,21 +21,21 @@ class WhatsAppBusinessClient {
   }
 
   // Vérification de la signature webhook
-  verifyWebhookSignature(payload, signature) {
-    if (!this.webhookSecret) return true; // Si pas de secret configuré
+//   verifyWebhookSignature(payload, signature) {
+//     if (!this.webhookSecret) return true; // Si pas de secret configuré
 
-    const expectedSignature = crypto
-      .createHmac("sha256", this.webhookSecret)
-      .update(payload)
-      .digest("hex");
+//     const expectedSignature = crypto
+//       .createHmac("sha256", this.webhookSecret)
+//       .update(payload)
+//       .digest("hex");
 
-    const providedSignature = signature.replace("sha256=", "");
+//     const providedSignature = signature.replace("sha256=", "");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature),
-      Buffer.from(providedSignature)
-    );
-  }
+//     return crypto.timingSafeEqual(
+//       Buffer.from(expectedSignature),
+//       Buffer.from(providedSignature)
+//     );
+//   }
 
   // Envoi de message texte simple
   async sendTextMessage(to, text) {

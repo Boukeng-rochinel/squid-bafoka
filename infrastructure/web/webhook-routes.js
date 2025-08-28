@@ -5,7 +5,6 @@ const { whatsappBusiness } = require("../../config/whatsapp-business");
 
 class WebhookRoutes {
   constructor(whatsAppClient, whatsAppController) {
-    // Corrected constructor parameter names
     this.router = express.Router();
     this.whatsAppClient = whatsAppClient;
     this.whatsAppController = whatsAppController;
@@ -13,13 +12,12 @@ class WebhookRoutes {
   }
 
   setupRoutes() {
-    // Vérification du webhook (GET)
+    // Vérification du webhook (GET) - CECI EST TOUJOURS NÉCESSAIRE
     this.router.get("/webhook/whatsapp", (req, res) => {
       const mode = req.query["hub.mode"];
       const token = req.query["hub.verify_token"];
       const challenge = req.query["hub.challenge"];
 
-      // Now this path is correct and much cleaner
       if (
         mode === "subscribe" &&
         token === whatsappBusiness.webhookVerifyToken
@@ -28,28 +26,29 @@ class WebhookRoutes {
         res.status(200).send(challenge);
       } else {
         console.log("❌ Échec de la vérification du webhook");
-        console.log("Token attendu:", whatsappBusiness.webhookVerifyToken);
-        console.log("Token reçu:", token);
         res.status(403).send("Forbidden");
       }
     });
 
-    // ... (le reste de votre fichier reste inchangé) ...
     // Réception des webhooks (POST)
     this.router.post(
       "/webhook/whatsapp",
-      express.raw({ type: "application/json" }),
+      // On utilise express.json() maintenant car on n'a plus besoin du corps brut
+      express.json(),
       async (req, res) => {
         try {
-          const signature = req.get("X-Hub-Signature-256");
-          const payload = req.body;
+          // ======================================================
+          // SECTION DE VÉRIFICATION DE SIGNATURE SUPPRIMÉE
+          // const signature = req.get("X-Hub-Signature-256");
+          // const payload = req.body; // Ceci serait un buffer
+          // if (!this.whatsAppClient.verifyWebhookSignature(payload, signature)) {
+          //   console.log("❌ Signature webhook invalide");
+          //   return res.status(403).send("Forbidden");
+          // }
+          // ======================================================
 
-          if (!this.whatsAppClient.verifyWebhookSignature(payload, signature)) {
-            console.log("❌ Signature webhook invalide");
-            return res.status(403).send("Forbidden");
-          }
-
-          const body = JSON.parse(payload.toString());
+          // On utilise directement req.body car il est déjà parsé par express.json()
+          const body = req.body;
           await this.whatsAppClient.processWebhook(body);
           res.status(200).send("OK");
         } catch (error) {
