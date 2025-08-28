@@ -10,7 +10,17 @@ class ExpressServer {
 
   setupMiddleware() {
     this.app.use(cors());
-    this.app.use(express.json());
+
+    // MODIFICATION HERE: Add the 'verify' option to express.json()
+    this.app.use(
+      express.json({
+        verify: (req, res, buf) => {
+          // Save the raw body as a string to a new property on the request object
+          req.rawBody = buf.toString();
+        },
+      })
+    );
+
     this.app.use(express.urlencoded({ extended: true }));
   }
 
