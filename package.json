@@ -2,7 +2,7 @@
   "name": "squid_bafoka",
   "version": "1.0.0",
   "description": "a project for managing trade",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/server.js",
@@ -17,8 +17,11 @@
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
+    "mongodb": "^6.19.0",
     "mongoose": "^8.18.0",
-    "nodejs": "^0.0.0"
+    "nodejs": "^0.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.32.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
