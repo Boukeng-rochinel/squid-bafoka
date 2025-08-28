@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const whatsappBusiness = require("../../config/whatsapp-business");
 
 class WebhookRoutes {
   constructor(WhatsAppBusinessClient, WhatsAppBusinessController) {
@@ -15,10 +16,10 @@ class WebhookRoutes {
       const mode = req.query["hub.mode"];
       const token = req.query["hub.verify_token"];
       const challenge = req.query["hub.challenge"];
-
+      console.log(`${whatsappBusiness.WEBHOOK_VERIFY_TOKE}`);
       if (
         mode === "subscribe" &&
-        token === this.whatsAppClient.webhookVerifyToken
+        token === whatsappBusiness.WEBHOOK_VERIFY_TOKEN
       ) {
         console.log("✅ Webhook vérifié avec succès");
         res.status(200).send(challenge);
