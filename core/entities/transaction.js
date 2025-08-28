@@ -25,3 +25,6 @@ class Transaction {
     return new Transaction(id, buyerId, sellerId, productId, amount, txHash);
   }
 }
+
+
+module.exports = Transaction;

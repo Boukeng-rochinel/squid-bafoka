@@ -1,55 +1,111 @@
 class WhatsAppBusinessController {
   constructor(
+    // Use Cases
     registerUser,
     createProduct,
     purchaseProduct,
+    proposeTrade, // New
+    executeTrade, // New
     listProducts,
+    // Repositories
     userRepository,
     productRepository,
+    tradeRepository, // New
+    // External Clients
     whatsAppClient
   ) {
     this.registerUser = registerUser;
     this.createProduct = createProduct;
     this.purchaseProduct = purchaseProduct;
+    this.proposeTrade = proposeTrade;
+    this.executeTrade = executeTrade;
     this.listProducts = listProducts;
     this.userRepository = userRepository;
     this.productRepository = productRepository;
+    this.tradeRepository = tradeRepository;
     this.whatsAppClient = whatsAppClient;
 
-    // États des conversations (utiliser Redis en production)
+    // For production, this should be a persistent store like Redis
     this.userStates = new Map();
   }
 
+  // ===== MAIN MESSAGE ROUTER =====
+
   async handleMessage(message) {
     const phoneNumber = message.from;
-    const text = message.body.toLowerCase().trim();
-    const userState = this.userStates.get(phoneNumber) || { step: "main" };
+    const text = message.body.trim();
+    const lowerCaseText = text.toLowerCase();
+
+    const userState = this.userStates.get(phoneNumber) || {
+      step: "main",
+      data: {},
+    };
+    const user = await this.userRepository.findByPhoneNumber(phoneNumber);
 
     try {
-      // Gestion des commandes avec boutons interactifs
-      if (text === "/start" || text === "menu" || text === "commencer") {
-        await this.sendMainMenu(phoneNumber);
-        this.userStates.set(phoneNumber, { step: "main" });
+      // Handle image uploads if user is in the correct state
+      if (
+        message.type === "image" &&
+        userState.step === "product_creation_image"
+      ) {
+        await this.handleProductCreationFlow(
+          phoneNumber,
+          userState,
+          text,
+          message.image.id
+        );
         return;
       }
 
-      // Gestion des réponses de boutons
-      if (text === "inscription" || text === "1") {
+      // Handle global commands
+      if (lowerCaseText === "menu") {
+        await this.sendMainMenu(phoneNumber);
+        this.userStates.set(phoneNumber, { step: "main", data: {} });
+        return;
+      }
+
+      // Route to the correct conversation flow based on state
+      if (userState.step.startsWith("registration_")) {
         await this.handleRegistrationFlow(phoneNumber, userState, text);
-      } else if (text === "produits" || text === "2") {
-        await this.handleProductListingFlow(phoneNumber);
-      } else if (text === "vendre" || text === "3") {
+      } else if (userState.step.startsWith("product_creation_")) {
         await this.handleProductCreationFlow(phoneNumber, userState, text);
-      } else if (text === "acheter" || text === "4") {
-        await this.handlePurchaseFlow(phoneNumber, userState, text);
-      } else if (text === "solde" || text === "5") {
-        await this.handleBalanceFlow(phoneNumber);
+      } else if (userState.step.startsWith("trade_")) {
+        await this.handleTradeFlow(phoneNumber, user, userState, text);
+      } else if (userState.step.startsWith("purchase_")) {
+        await this.handlePurchaseFlow(phoneNumber, user, userState, text);
+      } else if (userState.step === "main") {
+        // Handle main menu commands from a neutral state
+        const command = this.mapTextToCommand(lowerCaseText);
+        switch (command) {
+          case "register":
+            await this.handleRegistrationFlow(phoneNumber, userState, text);
+            break;
+          case "sell":
+            await this.handleProductCreationFlow(phoneNumber, userState, text);
+            break;
+          case "browse":
+            await this.handleProductListingFlow(phoneNumber);
+            break;
+          case "my_trades":
+            await this.handleMyTradesFlow(phoneNumber, user);
+            break;
+          default:
+            await this.whatsAppClient.sendTextMessage(
+              phoneNumber,
+              '🤔 Commande non reconnue. Tapez "menu" pour voir les options.'
+            );
+            break;
+        }
       } else {
-        // Gestion des flux de conversation
-        await this.handleConversationFlow(phoneNumber, userState, text);
+        this.userStates.set(phoneNumber, { step: "main", data: {} });
+        await this.whatsAppClient.sendTextMessage(
+          phoneNumber,
+          "Une erreur est survenue. Retour au menu principal."
+        );
       }
     } catch (error) {
       console.error("Erreur dans handleMessage:", error);
+      this.userStates.set(phoneNumber, { step: "main", data: {} });
       await this.whatsAppClient.sendTextMessage(
         phoneNumber,
         '❌ Une erreur s\'est produite. Tapez "menu" pour recommencer.'
@@ -57,264 +113,159 @@ class WhatsAppBusinessController {
     }
   }
 
-  async sendMainMenu(phoneNumber) {
-    const buttons = [
-      { title: "🆕 S'inscrire" },
-      { title: "🛍️ Produits" },
-      { title: "💰 Mon solde" },
-    ];
+  mapTextToCommand(text) {
+    if (["s'inscrire", "inscription", "register"].includes(text))
+      return "register";
+    if (["vendre", "sell"].includes(text)) return "sell";
+    if (["produits", "articles", "voir les produits", "browse"].includes(text))
+      return "browse";
+    if (["mes échanges", "my trades"].includes(text)) return "my_trades";
+    return "unknown";
+  }
 
+  // ===== CONVERSATIONAL FLOWS =====
+
+  async sendMainMenu(phoneNumber) {
+    const text = "🏪 *TrocSwap Marketplace*\n\nChoisissez une option :";
+    const buttons = [
+      { title: "🛍️ Voir les Articles" },
+      { title: "➕ Vendre un Article" },
+      { title: "📊 Mes Échanges" },
+    ];
     await this.whatsAppClient.sendInteractiveMessage(
       phoneNumber,
-      "🏪 *MARKETPLACE BLOCKCHAIN*\n\nBienvenue dans notre marketplace décentralisée !\n\nChoisissez une option :",
+      text,
       buttons
     );
-
-    // Envoyer aussi le menu étendu sous forme de liste
-    const sections = [
-      {
-        title: "Actions principales",
-        rows: [
-          {
-            id: "register",
-            title: "S'inscrire",
-            description: "Créer votre compte et wallet",
-          },
-          {
-            id: "products",
-            title: "Voir produits",
-            description: "Parcourir les produits disponibles",
-          },
-          {
-            id: "sell",
-            title: "Vendre",
-            description: "Mettre un produit en vente",
-          },
-        ],
-      },
-      {
-        title: "Mon compte",
-        rows: [
-          {
-            id: "balance",
-            title: "Mon solde",
-            description: "Consulter mon wallet",
-          },
-          {
-            id: "orders",
-            title: "Mes commandes",
-            description: "Historique des achats",
-          },
-        ],
-      },
-    ];
-
-    setTimeout(async () => {
-      await this.whatsAppClient.sendListMessage(
-        phoneNumber,
-        "Ou utilisez le menu détaillé ci-dessous :",
-        sections
-      );
-    }, 1000);
   }
 
   async handleRegistrationFlow(phoneNumber, userState, text) {
     if (userState.step === "main") {
-      // Vérifier si l'utilisateur existe
       const existingUser = await this.userRepository.findByPhoneNumber(
         phoneNumber
       );
       if (existingUser) {
         await this.whatsAppClient.sendTextMessage(
           phoneNumber,
-          `✅ *Vous êtes déjà inscrit !*\n\n👤 Nom: ${existingUser.name}\n💳 Wallet: \`${existingUser.walletAddress}\`\n\nTapez "menu" pour les options.`
+          `✅ Vous êtes déjà inscrit, ${existingUser.name} !`
         );
         return;
       }
-
-      this.userStates.set(phoneNumber, { step: "registration_name" });
+      this.userStates.set(phoneNumber, { step: "registration_name", data: {} });
       await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        "📝 *INSCRIPTION*\n\nPour créer votre compte, veuillez entrer votre nom complet :"
+        "📝 *Inscription*\n\nQuel est votre nom ?"
       );
-    } else if (userState.step === "registration_name") {
-      const result = await this.registerUser.execute(phoneNumber, text);
+      return;
+    }
+
+    if (userState.step === "registration_name") {
+      const name = text;
+      this.userStates.set(phoneNumber, {
+        step: "registration_password",
+        data: { name },
+      });
+      await this.whatsAppClient.sendTextMessage(
+        phoneNumber,
+        `OK, ${name}. Maintenant, créez un mot de passe (8 caractères min.) pour sécuriser votre compte.`
+      );
+      return;
+    }
+
+    if (userState.step === "registration_password") {
+      const password = text;
+      const { name } = userState.data;
+
+      const result = await this.registerUser.execute(
+        phoneNumber,
+        name,
+        password
+      );
 
       if (result.success) {
-        this.userStates.set(phoneNumber, { step: "main" });
-
-        // Message de confirmation avec template
-        await this.whatsAppClient.sendTextMessage(
-          phoneNumber,
-          `🎉 *Inscription réussie !*\n\n👤 Nom: ${result.user.name}\n💳 Adresse Wallet:\n\`${result.user.walletAddress}\`\n\n🔐 *Clé privée (IMPORTANTE) :*\n\`${result.wallet.privateKey}\``
-        );
-
-        await this.whatsAppClient.sendTextMessage(
-          phoneNumber,
-          "⚠️ *IMPORTANT*\n\n• Sauvegardez votre clé privée dans un endroit sûr\n• Ne la partagez jamais\n• Elle est nécessaire pour les achats\n\nVotre wallet est maintenant prêt ! 🎊"
-        );
-
-        // Envoyer le menu principal
-        setTimeout(async () => {
-          await this.sendMainMenu(phoneNumber);
-        }, 2000);
+        this.userStates.set(phoneNumber, { step: "main", data: {} });
+        const successMessage = `🎉 *Inscription réussie !*\n\n👤 Nom: ${result.user.name}\n💳 Adresse Wallet:\n\`${result.user.walletAddress}\`\n\nVotre compte est protégé par votre mot de passe.`;
+        await this.whatsAppClient.sendTextMessage(phoneNumber, successMessage);
+        setTimeout(() => this.sendMainMenu(phoneNumber), 1000);
       } else {
-        this.userStates.set(phoneNumber, { step: "main" });
+        this.userStates.set(phoneNumber, { step: "main", data: {} });
         await this.whatsAppClient.sendTextMessage(
           phoneNumber,
-          `❌ Erreur lors de l'inscription: ${result.error}\n\nTapez "menu" pour recommencer.`
+          `❌ Erreur: ${result.error}`
         );
       }
     }
   }
 
-  async handleProductListingFlow(phoneNumber) {
-    const result = await this.listProducts.execute();
-
-    if (result.success && result.products.length > 0) {
-      // Créer une liste interactive des produits
-      const sections = [];
-      const categories = [...new Set(result.products.map((p) => p.category))];
-
-      for (const category of categories) {
-        const categoryProducts = result.products.filter(
-          (p) => p.category === category
-        );
-        const rows = categoryProducts.slice(0, 10).map((product) => ({
-          id: product.id,
-          title: `${product.name} - ${product.price} ETH`,
-          description: product.description.substring(0, 60) + "...",
-        }));
-
-        sections.push({
-          title: category.charAt(0).toUpperCase() + category.slice(1),
-          rows: rows,
-        });
-      }
-
-      await this.whatsAppClient.sendListMessage(
-        phoneNumber,
-        `🛍️ *${result.products.length} PRODUITS DISPONIBLES*\n\nSélectionnez un produit pour plus de détails :`,
-        sections
-      );
-
-      // Boutons d'action
-      const buttons = [
-        { title: "🏪 Vendre aussi" },
-        { title: "🏠 Menu principal" },
-      ];
-
-      setTimeout(async () => {
-        await this.whatsAppClient.sendInteractiveMessage(
-          phoneNumber,
-          "Que souhaitez-vous faire ?",
-          buttons
-        );
-      }, 1000);
-    } else if (result.success && result.products.length === 0) {
-      await this.whatsAppClient.sendTextMessage(
-        phoneNumber,
-        '📭 *Aucun produit disponible*\n\nSoyez le premier à vendre sur notre marketplace !\n\nTapez "vendre" pour commencer.'
-      );
-    } else {
-      await this.whatsAppClient.sendTextMessage(
-        phoneNumber,
-        `❌ Erreur: ${result.error}`
-      );
-    }
-  }
-
-  async handleProductCreationFlow(phoneNumber, userState, text) {
+  async handleProductCreationFlow(
+    phoneNumber,
+    userState,
+    text,
+    imageId = null
+  ) {
     const user = await this.userRepository.findByPhoneNumber(phoneNumber);
     if (!user) {
-      const buttons = [{ title: "📝 S'inscrire maintenant" }];
-      await this.whatsAppClient.sendInteractiveMessage(
+      await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        "❌ Vous devez d'abord vous inscrire pour vendre.",
-        buttons
+        "❌ Vous devez d'abord vous inscrire."
       );
       return;
     }
 
     if (userState.step === "main") {
       this.userStates.set(phoneNumber, {
-        step: "product_name",
-        productData: {},
+        step: "product_creation_name",
+        data: {},
       });
       await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        '📦 *VENDRE UN PRODUIT*\n\nCommençons par le nom de votre produit :\n\n💡 Exemple: "iPhone 14 Pro Max 256GB"'
+        "📦 *Vendre un Article*\n\nQuel est le nom de votre article ?"
       );
-    } else if (userState.step === "product_name") {
-      userState.productData.name = text;
-      this.userStates.set(phoneNumber, {
-        step: "product_description",
-        productData: userState.productData,
-      });
+      return;
+    }
+
+    if (userState.step === "product_creation_name") {
+      userState.data.name = text;
+      userState.step = "product_creation_value";
+      this.userStates.set(phoneNumber, userState);
       await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        `✅ Nom: ${text}\n\n📝 Maintenant, décrivez votre produit :\n\n💡 Exemple: "Excellent état, acheté il y a 6 mois, tous accessoires inclus"`
+        `✅ Nom: ${text}\n\n💰 Quelle est sa valeur en 'bamekap' ? (ex: 5000)`
       );
-    } else if (userState.step === "product_description") {
-      userState.productData.description = text;
-      this.userStates.set(phoneNumber, {
-        step: "product_price",
-        productData: userState.productData,
-      });
-      await this.whatsAppClient.sendTextMessage(
-        phoneNumber,
-        `✅ Description ajoutée\n\n💰 Quel est le prix en ETH ?\n\n💡 Exemple: 0.5 (pour 0.5 ETH)`
-      );
-    } else if (userState.step === "product_price") {
-      const price = parseFloat(text);
-      if (isNaN(price) || price <= 0) {
+      return;
+    }
+
+    if (userState.step === "product_creation_value") {
+      const value = parseFloat(text);
+      if (isNaN(value) || value <= 0) {
         await this.whatsAppClient.sendTextMessage(
           phoneNumber,
-          "❌ Prix invalide. Entrez un nombre positif (exemple: 0.1) :"
+          "❌ Valeur invalide. Veuillez entrer un nombre positif."
         );
         return;
       }
-
-      userState.productData.price = price;
-
-      // Proposer des catégories via boutons
-      const buttons = [
-        { title: "📱 Électronique" },
-        { title: "👕 Vêtements" },
-        { title: "🏠 Maison" },
-      ];
-
-      this.userStates.set(phoneNumber, {
-        step: "product_category",
-        productData: userState.productData,
-      });
-
-      await this.whatsAppClient.sendInteractiveMessage(
+      userState.data.value = value;
+      userState.step = "product_creation_image";
+      this.userStates.set(phoneNumber, userState);
+      await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        `✅ Prix: ${price} ETH\n\n🏷️ Choisissez une catégorie ou tapez la vôtre :`,
-        buttons
+        "🖼️ Presque fini ! Envoyez maintenant la photo de votre produit."
       );
-    } else if (userState.step === "product_category") {
-      let category = text;
+      return;
+    }
 
-      // Mapper les boutons aux catégories
-      const categoryMap = {
-        "📱 électronique": "électronique",
-        "👕 vêtements": "vêtements",
-        "🏠 maison": "maison",
-      };
+    if (userState.step === "product_creation_image" && imageId) {
+      // Here you would have a media service to handle the download
+      // const imageUrl = await this.mediaService.saveImageFromWhatsApp(imageId);
+      const imageUrl = `https://placeholder.url/for/${imageId}`; // Placeholder
 
-      category = categoryMap[text.toLowerCase()] || text;
-      userState.productData.category = category;
-
-      // Créer le produit
       const result = await this.createProduct.execute(
         user.id,
-        userState.productData.name,
-        userState.productData.description,
-        userState.productData.price,
-        "", // imageUrl à implémenter
-        userState.productData.category
+        userState.data.name,
+        "", // Description
+        userState.data.value,
+        imageUrl,
+        "default"
       );
 
       this.userStates.set(phoneNumber, { step: "main" });
@@ -322,93 +273,87 @@ class WhatsAppBusinessController {
       if (result.success) {
         await this.whatsAppClient.sendTextMessage(
           phoneNumber,
-          `🎉 *Produit créé avec succès !*\n\n📦 ${result.product.name}\n💰 ${
-            result.product.price
-          } ETH\n🏷️ ${
-            result.product.category
-          }\n🆔 ID: \`${result.product.id.substring(
-            0,
-            12
-          )}...\`\n\n✅ Votre produit est maintenant visible dans le marketplace !`
+          `🎉 *Article créé avec succès !*\n\n📦 ${result.product.name}\n💰 ${result.product.value} bamekap`
         );
-
-        const buttons = [
-          { title: "➕ Vendre un autre" },
-          { title: "🛍️ Voir mes produits" },
-          { title: "🏠 Menu principal" },
-        ];
-
-        setTimeout(async () => {
-          await this.whatsAppClient.sendInteractiveMessage(
-            phoneNumber,
-            "Que souhaitez-vous faire maintenant ?",
-            buttons
-          );
-        }, 1000);
       } else {
         await this.whatsAppClient.sendTextMessage(
           phoneNumber,
-          `❌ Erreur: ${result.error}\n\nTapez "menu" pour recommencer.`
+          `❌ Erreur: ${result.error}`
         );
       }
     }
   }
 
-  async handleBalanceFlow(phoneNumber) {
-    const user = await this.userRepository.findByPhoneNumber(phoneNumber);
+  async handlePurchaseFlow(phoneNumber, user, userState, text) {
     if (!user) {
-      const buttons = [{ title: "📝 S'inscrire maintenant" }];
-      await this.whatsAppClient.sendInteractiveMessage(
-        phoneNumber,
-        "❌ Vous devez d'abord vous inscrire.",
-        buttons
-      );
-      return;
+      /* ... handle not registered ... */ return;
     }
 
-    // Récupérer les transactions de l'utilisateur
-    // const transactions = await this.transactionRepository.findByUserId(user.id);
+    if (userState.step.startsWith("purchase_")) {
+      // Simplified placeholder
+      const password = text;
+      const { productId } = userState.data;
 
-    await this.whatsAppClient.sendTextMessage(
-      phoneNumber,
-      `💳 *VOTRE WALLET*\n\n👤 ${user.name}\n📍 Adresse:\n\`${user.walletAddress}\`\n\n💰 Solde: [Connexion blockchain...]\n\n💡 Pour recharger, envoyez des ETH à cette adresse depuis votre wallet externe.`
-    );
-
-    const buttons = [
-      { title: "🔄 Actualiser" },
-      { title: "📜 Historique" },
-      { title: "🏠 Menu" },
-    ];
-
-    setTimeout(async () => {
-      await this.whatsAppClient.sendInteractiveMessage(
-        phoneNumber,
-        "Options wallet :",
-        buttons
-      );
-    }, 1000);
-  }
-
-  async handleConversationFlow(phoneNumber, userState, text) {
-    // Gérer les flux de conversation en cours
-    if (userState.step === "registration_name") {
-      await this.handleRegistrationFlow(phoneNumber, userState, text);
-    } else if (userState.step?.startsWith("product_")) {
-      await this.handleProductCreationFlow(phoneNumber, userState, text);
-    } else if (userState.step?.startsWith("purchase_")) {
-      await this.handlePurchaseFlow(phoneNumber, userState, text);
-    } else {
-      // Message par défaut
       await this.whatsAppClient.sendTextMessage(
         phoneNumber,
-        '🤔 Je n\'ai pas compris votre demande.\n\nTapez "menu" pour voir les options disponibles.'
+        "⏳ Traitement de votre achat en cours..."
       );
+      const result = await this.purchaseProduct.execute(
+        user.id,
+        productId,
+        password
+      );
+
+      this.userStates.set(phoneNumber, { step: "main" });
+
+      if (result.success) {
+        await this.whatsAppClient.sendTextMessage(
+          phoneNumber,
+          `🎉 *Achat réussi !*\n\n📄 Hash:\n\`${result.txHash}\``
+        );
+      } else {
+        await this.whatsAppClient.sendTextMessage(
+          phoneNumber,
+          `❌ Erreur: ${result.error}`
+        );
+      }
     }
   }
 
-  async handlePurchaseFlow(phoneNumber, userState, text) {
-    // Implémentation similaire à l'ancienne version mais avec l'API Business
-    // ... (logique d'achat)
+  async handleTradeFlow(phoneNumber, user, userState, text) {
+    if (!user) {
+      /* ... handle not registered ... */ return;
+    }
+
+    // Placeholder for the very complex escrow flow
+    if (userState.step.startsWith("trade_")) {
+      const password = text;
+      const { tradeId } = userState.data;
+
+      await this.whatsAppClient.sendTextMessage(
+        phoneNumber,
+        "⏳ Exécution de l'action sur l'escrow en cours..."
+      );
+      const result = await this.executeTrade.execute(
+        tradeId,
+        user.id,
+        password
+      );
+
+      this.userStates.set(phoneNumber, { step: "main" });
+
+      if (result.success) {
+        await this.whatsAppClient.sendTextMessage(
+          phoneNumber,
+          `✅ Action réussie ! ${result.message}`
+        );
+      } else {
+        await this.whatsAppClient.sendTextMessage(
+          phoneNumber,
+          `❌ Erreur d'escrow: ${result.error}`
+        );
+      }
+    }
   }
 }
 
