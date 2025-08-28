@@ -394,10 +394,10 @@ class WhatsAppBusinessController {
 
   async handleMessage(message) {
     // NOUVEAU : Détecter et gérer les événements de groupe en premier
-    if (message.type === "participant_change") {
-      await this.handleGroupParticipantChange(message);
-      return; // Arrêter le traitement ici car ce n'est pas un message pour le bot
-    }
+    // if (message.type === "participant_change") {
+    //   await this.handleGroupParticipantChange(message);
+    //   return; // Arrêter le traitement ici car ce n'est pas un message pour le bot
+    // }
 
     const phoneNumber = message.from;
     const text = message.body.trim();
