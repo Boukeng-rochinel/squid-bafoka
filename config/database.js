@@ -1,36 +1,46 @@
-// const mongoose = require("mongoose");
-// require("dotenv").config();
+const mongoose = require("mongoose");
+const { ethers } = require("ethers");
 
-// const MONGODB_URI = process.env.MONGODB_URI;
+const connectDB = async () => {
+  try {
+    const MONGODB_URI = process.env.MONGODB_URI;
+    if (!MONGODB_URI) {
+      throw new Error(
+        "La variable d'environnement MONGODB_URI n'est pas définie."
+      );
+    }
 
-// const connectDB = async () => {
-//   try {
-//     await mongoose.connect(MONGODB_URI);
-//     console.log("✅ Connexion à MongoDB réussie !");
-//   } catch (error) {
-//     console.error("❌ Erreur de connexion à MongoDB :", error.message);
-//     // Quitter le processus avec une erreur
-//     process.exit(1);
-//   }
-// };
-
-// module.exports = connectDB;
-
-module.exports = {
-  mongodb: {
-    connectionString:
-      process.env.MONGODB_CONNECTION || "mongodb://localhost:27017",
-    dbName: process.env.DB_NAME || "marketplace_blockchain",
-  },
-  
-  blockchain: {
-    providerUrl:
-      process.env.BLOCKCHAIN_PROVIDER_URL ||
-      "https://mainnet.infura.io/v3/YOUR_PROJECT_ID",
-    chainId: parseInt(process.env.CHAIN_ID) || 1,
-  },
-  server: {
-    port: parseInt(process.env.PORT) || 3000,
-  },
-  
+    await mongoose.connect(MONGODB_URI);
+    console.log("✅ Connexion à MongoDB réussie !");
+  } catch (error) {
+    console.error("❌ Erreur de connexion à MongoDB :", error.message);
+    process.exit(1);
+  }
 };
+
+const connectPolygon = async () => {
+  try {
+    const POLYGON_PROVIDER_URL = process.env.BLOCKCHAIN_PROVIDER_URL;
+    if (!POLYGON_PROVIDER_URL) {
+      throw new Error(
+        "La variable d'environnement BLOCKCHAIN_PROVIDER_URL n'est pas définie."
+      );
+    }
+
+    const provider = new ethers.JsonRpcProvider(POLYGON_PROVIDER_URL);
+    const network = await provider.getNetwork();
+    const blockNumber = await provider.getBlockNumber();
+
+    console.log(
+      `✅ Connexion à Polygon réussie ! (Réseau: ${network.name}, Dernier bloc: ${blockNumber})`
+    );
+
+    return provider;
+  } catch (error) {
+    console.error("❌ Erreur de connexion à Polygon :", error.message);
+    process.exit(1);
+  }
+};
+
+// Export only the connection functions
+module.exports = { connectDB, connectPolygon };

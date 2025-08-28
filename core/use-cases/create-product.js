@@ -48,7 +48,7 @@
 // module.exports = CreateProduct;
 
 // We import the Product entity to be able to instantiate it
-const  Product  = require('../entities/product'); // Make sure the path is correct
+const  Product  = require('../entities/product.model'); // Make sure the path is correct
 
 class CreateProduct {
   constructor(productRepository, userRepository) {

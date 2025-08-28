@@ -1,11 +1,15 @@
 const { ethers } = require("ethers");
 const IBlockchainService = require("../../core/repositories/i-blockchain-service");
 
-class EthereumService extends IBlockchainService {
-  constructor(providerUrl, chainId = 1) {
+class PolygonService extends IBlockchainService {
+  /**
+   * @param {ethers.Provider} provider - A pre-connected ethers provider instance from your main startup file.
+   */
+  constructor(provider) {
     super();
-    this.provider = new ethers.JsonRpcProvider(providerUrl);
-    this.chainId = chainId;
+    // CORRECTION: We receive the already-connected provider directly
+    // instead of creating a new one.
+    this.provider = provider;
   }
 
   async createWallet() {
@@ -36,16 +40,14 @@ class EthereumService extends IBlockchainService {
   ) {
     try {
       const wallet = new ethers.Wallet(privateKey, this.provider);
-
+      const feeData = await this.provider.getFeeData();
       const tx = {
         to: toWalletAddress,
         value: ethers.parseEther(amount.toString()),
-        gasLimit: 21000,
+        gasPrice: feeData.gasPrice,
       };
-
       const transaction = await wallet.sendTransaction(tx);
       await transaction.wait();
-
       return {
         txHash: transaction.hash,
         blockNumber: transaction.blockNumber,
@@ -62,7 +64,6 @@ class EthereumService extends IBlockchainService {
     try {
       const tx = await this.provider.getTransaction(txHash);
       const receipt = await this.provider.getTransactionReceipt(txHash);
-
       return {
         exists: !!tx,
         confirmed: !!receipt,
@@ -76,5 +77,4 @@ class EthereumService extends IBlockchainService {
   }
 }
 
-
-module.exports = EthereumService
+module.exports = PolygonService;

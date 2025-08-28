@@ -76,7 +76,7 @@
 // module.exports = PurchaseProduct;
 
 // Import des entités et interfaces nécessaires
-const Transaction = require("../entities/transaction");
+const Transaction = require("../entities/transaction.model");
 const IUserRepository = require("../repositories/i-user-repositories");
 const IProductRepository = require("../repositories/i-product-repository");
 const ITransactionRepository = require("../repositories/i-transaction-repository");

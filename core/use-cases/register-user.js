@@ -1,4 +1,4 @@
-const User = require("../entities/user");
+const User = require("../entities/user.model");
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 10; // Standard for bcrypt hashing
 

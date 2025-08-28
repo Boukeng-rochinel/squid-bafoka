@@ -1,5 +1,5 @@
 // You must import your Trade entity at the top
-const { Trade } = require("../entities/trade");
+const { Trade } = require("../entities/trade.model");
 
 class ProposeTrade {
   constructor(tradeRepository, productRepository, userRepository) {

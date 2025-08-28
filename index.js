@@ -1,15 +1,16 @@
 require("dotenv").config();
+const { connectDB, connectPolygon } = require("./config/database"); // Assurez-vous que le nom du fichier est correct
 const config = require("./config/database");
 const whatsappConfig = require("./config/whatsapp-business");
 
 // Repositories
 const MongoUserRepository = require("./infrastructure/database/mongo-user-repository");
 const MongoProductRepository = require("./infrastructure/database/mongo-product-repository");
-const MongoTradeRepository = require("./infrastructure/database/mongo-trade-repository"); // Assurez-vous d'importer celui-ci
+const MongoTradeRepository = require("./infrastructure/database/mongo-trade-repository");
 
 // Infrastructure
 const WhatsAppBusinessClient = require("./infrastructure/messaging/whatsapp-business-client");
-const EthereumService = require("./infrastructure/blockchain/ethereum-service");
+const PolygonService = require("./infrastructure/blockchain/polygon-service"); // Nom de classe corrigé
 const ExpressServer = require("./infrastructure/web/express-server");
 const WebhookRoutes = require("./infrastructure/web/webhook-routes");
 
@@ -18,8 +19,8 @@ const RegisterUser = require("./core/use-cases/register-user");
 const CreateProduct = require("./core/use-cases/create-product");
 const PurchaseProduct = require("./core/use-cases/purchase-product");
 const ListProducts = require("./core/use-cases/list-products");
-const ProposeTrade = require("./core/use-cases/propose-trade"); // Assurez-vous d'importer
-const ExecuteTrade = require("./core/use-cases/execute-trade"); // Assurez-vous d'importer
+const ProposeTrade = require("./core/use-cases/propose-trade");
+const ExecuteTrade = require("./core/use-cases/execute-trade");
 
 // Controller
 const WhatsAppBusinessController = require("./interfaces/controllers/whatsapp-business-controller");
@@ -28,27 +29,21 @@ class Application {
   async initialize() {
     console.log("🚀 Initialisation de l'application...");
 
-    // Initialisation des repositories
-    this.userRepository = new MongoUserRepository(
-      config.mongodb.connectionString,
-      config.mongodb.dbName
-    );
-    this.productRepository = new MongoProductRepository(
-      config.mongodb.connectionString,
-      config.mongodb.dbName
-    );
-    this.tradeRepository = new MongoTradeRepository(
-      config.mongodb.connectionString,
-      config.mongodb.dbName
-    ); // Initialiser le trade repo
+    // 1. Établir les connexions externes
+    await connectDB();
+    const polygonProvider = await connectPolygon();
 
-    // Initialisation du service blockchain
-    this.blockchainService = new EthereumService(
-      config.blockchain.providerUrl,
-      config.blockchain.chainId
-    );
+    // 2. Initialiser les repositories (en utilisant le pattern Mongoose)
+    // CORRECTION: Assigner à 'this.' pour les rendre accessibles dans la classe
+    this.userRepository = new MongoUserRepository();
+    this.productRepository = new MongoProductRepository();
+    this.tradeRepository = new MongoTradeRepository();
 
-    // Initialisation des use cases
+    // 3. Initialiser le service blockchain
+    // CORRECTION: Assigner à 'this.'
+    this.blockchainService = new PolygonService(polygonProvider);
+
+    // 4. Initialiser les cas d'utilisation en utilisant les propriétés de la classe
     this.registerUser = new RegisterUser(
       this.userRepository,
       this.blockchainService
@@ -76,48 +71,45 @@ class Application {
       this.blockchainService
     );
 
-    // Initialisation du client WhatsApp
+    // 5. Initialiser le client WhatsApp
     this.whatsAppClient = new WhatsAppBusinessClient(
       whatsappConfig.whatsappBusiness
     );
 
-    // CORRECTION : Initialisation du contrôleur WhatsApp avec TOUTES ses dépendances
+    // 6. Initialiser le contrôleur avec TOUTES ses dépendances
     this.whatsAppController = new WhatsAppBusinessController(
       this.registerUser,
       this.createProduct,
       this.purchaseProduct,
-      this.proposeTrade, // Ajouté
-      this.executeTrade, // Ajouté
+      this.proposeTrade,
+      this.executeTrade,
       this.listProducts,
       this.userRepository,
       this.productRepository,
-      this.tradeRepository, // Ajouté
-      this.whatsAppClient // Ajouté
+      this.tradeRepository,
+      this.whatsAppClient
     );
 
-    // Lier les messages entrants du client au contrôleur
+    // 7. Lier les messages entrants du client au contrôleur
     this.whatsAppClient.addMessageHandler(
       this.whatsAppController.handleMessage.bind(this.whatsAppController)
     );
 
-    // Initialisation du serveur web
-    this.expressServer = new ExpressServer(config.server.port);
+    // 8. Initialiser le serveur web et les routes
 
-    // Création et montage des routes du webhook
+    this.expressServer = new ExpressServer(5000);
     const webhookRoutes = new WebhookRoutes(
       this.whatsAppClient,
       this.whatsAppController
     );
     this.expressServer.setupRoutes(webhookRoutes.getRouter());
 
-    // Routes API (optionnelles)
+    // Ajout des routes API optionnelles
     const apiRoutes = [
       {
         method: "get",
         path: "/api/health",
-        handler: (req, res) => {
-          res.json({ status: "OK", timestamp: new Date().toISOString() });
-        },
+        handler: (req, res) => res.json({ status: "OK" }),
       },
       {
         method: "get",
@@ -131,9 +123,7 @@ class Application {
           }
         },
       },
-      // CORRECTION : La route du webhook a été supprimée d'ici car elle est gérée par WebhookRoutes
     ];
-
     this.expressServer.addRoutes(apiRoutes);
 
     console.log("✅ Application initialisée avec succès!");
@@ -145,9 +135,6 @@ class Application {
       await this.expressServer.start();
       console.log("🎉 Application démarrée avec succès!");
       console.log("📱 WhatsApp Bot prêt à recevoir des messages");
-      console.log(
-        `🌐 Serveur API disponible sur http://localhost:${config.server.port}`
-      );
     } catch (error) {
       console.error("❌ Erreur lors du démarrage:", error);
       process.exit(1);

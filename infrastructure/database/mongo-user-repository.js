@@ -1,88 +1,34 @@
-const { MongoClient } = require("mongodb");
+// Import the Mongoose model, not the entity class
+const User = require("../../core/entities/user.model");
 const IUserRepository = require("../../core/repositories/i-user-repositories");
-const { User } = require("../../core/entities/user");
 
 class MongoUserRepository extends IUserRepository {
-  constructor(connectionString, dbName) {
+  constructor() {
     super();
-    this.connectionString = connectionString;
-    this.dbName = dbName;
-    this.collectionName = "users";
+    // The connection is now managed globally by Mongoose, no need for 'db'
   }
 
-  async getCollection() {
-    const client = new MongoClient(this.connectionString);
-    await client.connect();
-    const db = client.db(this.dbName);
-    return { collection: db.collection(this.collectionName), client };
-  }
-
-  async save(user) {
-    const { collection, client } = await this.getCollection();
-    try {
-      const result = await collection.replaceOne({ id: user.id }, user, {
-        upsert: true,
-      });
-      return result.acknowledged;
-    } finally {
-      await client.close();
-    }
+  async save(userEntity) {
+    // Use Mongoose's powerful findOneAndUpdate method with upsert
+    await User.findOneAndUpdate({ id: userEntity.id }, userEntity, {
+      new: true,
+      upsert: true,
+    });
+    return true;
   }
 
   async findByPhoneNumber(phoneNumber) {
-    const { collection, client } = await this.getCollection();
-    try {
-      const userData = await collection.findOne({ phoneNumber });
-      return userData
-        ? new User(
-            userData.id,
-            userData.phoneNumber,
-            userData.walletAddress,
-            userData.name,
-            userData.createdAt
-          )
-        : null;
-    } finally {
-      await client.close();
-    }
+    // Use the Mongoose model to find the user
+    return User.findOne({ phoneNumber });
   }
 
   async findById(id) {
-    const { collection, client } = await this.getCollection();
-    try {
-      const userData = await collection.findOne({ id });
-      return userData
-        ? new User(
-            userData.id,
-            userData.phoneNumber,
-            userData.walletAddress,
-            userData.name,
-            userData.createdAt
-          )
-        : null;
-    } finally {
-      await client.close();
-    }
+    return User.findOne({ id });
   }
 
   async findByWalletAddress(walletAddress) {
-    const { collection, client } = await this.getCollection();
-    try {
-      const userData = await collection.findOne({ walletAddress });
-      return userData
-        ? new User(
-            userData.id,
-            userData.phoneNumber,
-            userData.walletAddress,
-            userData.name,
-            userData.createdAt
-          )
-        : null;
-    } finally {
-      await client.close();
-    }
+    return User.findOne({ walletAddress });
   }
 }
-
 
 module.exports = MongoUserRepository;
