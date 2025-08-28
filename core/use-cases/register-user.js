@@ -55,6 +55,10 @@ class RegisterUser {
           name: user.name,
           walletAddress: user.walletAddress,
         },
+        // Add this back so the controller can show it to the user once
+        wallet: {
+          encryptedPrivateKey: encryptedPrivateKey,
+        },
       };
     } catch (error) {
       return {
