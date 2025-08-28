@@ -216,6 +216,7 @@ const MongoProductRepository = require("./infrastructure/database/mongo-product-
 const MongoTransactionRepository = require("./infrastructure/database/mongo-transaction-repository");
 const WhatsAppBusinessClient = require("./infrastructure/messaging/whatsapp-business-client");
 // Services
+const WhatsAppBusinessController = require("./interfaces/controllers/whatsapp-business-controller")
 const EthereumService = require("./infrastructure/blockchain/ethereum-service");
 // const {
 //   WhatsAppBusinessClient,
@@ -226,7 +227,7 @@ const RegisterUser = require("./core/use-cases/register-user");
 const CreateProduct = require("./core/use-cases/create-product");
 const PurchaseProduct = require("./core/use-cases/purchase-product");
 const ListProducts = require("./core/use-cases/list-products");
-
+const WebhookRoutes = require("./infrastructure/web/webhook-routes");
 // Controllers
 const WhatsAppController = require("./interfaces/controllers/whatsapp-business-controller");
 
@@ -307,12 +308,25 @@ class Application {
 
     // Initialisation du serveur web (optionnel, pour APIs REST)
     this.expressServer = new ExpressServer(config.server.port);
+    const webhookRoutes = new WebhookRoutes(
+      WhatsAppBusinessClient,
+      WhatsAppBusinessController
+    );
 
+    // Montage du routeur sur l'app Express
+  this.expressServer.setupRoutes(webhookRoutes.getRouter());
     // Routes API (optionnelles)
     const apiRoutes = [
       {
         method: "get",
         path: "/api/health",
+        handler: (req, res) => {
+          res.json({ status: "OK", timestamp: new Date().toISOString() });
+        },
+      },
+      {
+        method: "get",
+        path: "/",
         handler: (req, res) => {
           res.json({ status: "OK", timestamp: new Date().toISOString() });
         },

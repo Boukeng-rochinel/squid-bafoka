@@ -2,10 +2,10 @@ const express = require("express");
 const crypto = require("crypto");
 
 class WebhookRoutes {
-  constructor(whatsAppClient, whatsAppController) {
+  constructor(WhatsAppBusinessClient, WhatsAppBusinessController) {
     this.router = express.Router();
-    this.whatsAppClient = whatsAppClient;
-    this.whatsAppController = whatsAppController;
+    this.whatsAppClient = WhatsAppBusinessClient;
+    this.whatsAppController = WhatsAppBusinessController;
     this.setupRoutes();
   }
 
@@ -86,3 +86,5 @@ class WebhookRoutes {
     return this.router;
   }
 }
+
+module.exports = WebhookRoutes;

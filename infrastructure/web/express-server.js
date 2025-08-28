@@ -20,6 +20,11 @@ class ExpressServer {
     });
   }
 
+  setupRoutes(router) {
+    this.app.use("/", router);
+    console.log("✅ Routes connectées au serveur Express.");
+  }
+
   async start() {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
@@ -40,6 +45,5 @@ class ExpressServer {
     }
   }
 }
-
 
 module.exports = ExpressServer;

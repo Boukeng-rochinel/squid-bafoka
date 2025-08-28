@@ -22,6 +22,7 @@ module.exports = {
       process.env.MONGODB_CONNECTION || "mongodb://localhost:27017",
     dbName: process.env.DB_NAME || "marketplace_blockchain",
   },
+  
   blockchain: {
     providerUrl:
       process.env.BLOCKCHAIN_PROVIDER_URL ||
@@ -31,4 +32,5 @@ module.exports = {
   server: {
     port: parseInt(process.env.PORT) || 3000,
   },
+  
 };
