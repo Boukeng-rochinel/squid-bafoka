@@ -1,4 +1,4 @@
-const { User } = require("../entities/user"); // Import your pure entity class
+const { User } = require("../entities/user.model"); // Import your pure entity class
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 10;
 
