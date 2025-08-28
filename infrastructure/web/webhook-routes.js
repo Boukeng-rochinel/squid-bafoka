@@ -16,7 +16,7 @@ class WebhookRoutes {
       const mode = req.query["hub.mode"];
       const token = req.query["hub.verify_token"];
       const challenge = req.query["hub.challenge"];
-      console.log(`${whatsappBusiness.WEBHOOK_VERIFY_TOKE}`);
+      console.log(`${whatsappBusiness.WEBHOOK_VERIFY_TOKEN}`);
       if (
         mode === "subscribe" &&
         token === whatsappBusiness.WEBHOOK_VERIFY_TOKEN

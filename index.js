@@ -207,7 +207,7 @@
 // }
 
 // module.exports = { BusinessApplication };
-
+require("dotenv").config();
 const config = require("./config/database");
 const whatsappConfig = require("./config/whatsapp-business");
 // Repositories
