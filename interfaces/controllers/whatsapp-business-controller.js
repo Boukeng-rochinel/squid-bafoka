@@ -594,14 +594,15 @@ class WhatsAppBusinessController {
     }
     if (userState.step === "product_creation_image") {
       const imageUrl = `https://placeholder.url/for/${textOrImageId}`;
-      const result = await this.createProduct.execute({
-        ownerId: user.id,
-        name: userState.data.name,
-        description: "",
-        value: userState.data.value,
-        imageUrl: imageUrl,
-        category: "default",
-      });
+      // Correct (il faut passer les arguments séparément)
+      const result = await this.createProduct.execute(
+        user.id,
+        userState.data.name,
+        "", // Description
+        userState.data.value,
+        imageUrl,
+        "default"
+      );
       this.userStates.set(phoneNumber, { step: "main" });
       if (result.success) {
         await this.whatsAppClient.sendTextMessage(
